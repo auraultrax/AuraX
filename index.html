@@ -475,6 +475,8 @@
         }
         .mobile-top-bar .brand { font-size: 1rem; }
         .mobile-top-bar .user-avatar-mini { cursor: pointer; width: 34px; height: 34px; }
+        .mobile-top-bar .mobile-top-bell { position: relative; cursor: pointer; font-size: 1.25rem; color: var(--text-main); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
+        .mobile-top-bar .mobile-top-bell .notif-badge-dot { top: -2px; left: 18px; }
     
         .google-btn { width:100%; background:#fff; color:#222; border:1px solid #ddd; margin-bottom:10px; }
         .google-btn:hover { background:#f4f4f4; }
@@ -522,10 +524,13 @@
     <!-- MAIN APP STRUCTURE -->
     <div id="app">
         
-        <!-- MOBİL ÜST ÇUBUK (profil erişimi için) -->
+        <!-- MOBİL ÜST ÇUBUK: profil solda, bildirimler sağda -->
         <div class="mobile-top-bar">
-            <div class="brand"><i class="fa-solid fa-bolt-lightning"></i> Aura</div>
             <div class="user-avatar-mini" id="mobileTopAvatar" onclick="openProfilePanel()">U</div>
+            <div class="mobile-top-bell" onclick="openNotifPanel()">
+                <i class="fa-solid fa-bell"></i>
+                <span class="notif-badge-dot" id="notifBadgeTopBar">0</span>
+            </div>
         </div>
 
         <!-- SIDEBAR -->
@@ -1209,7 +1214,7 @@
 
         function renderNotifBadge() {
             const count = db_notifications.filter(n => !n.read).length;
-            ['notifBadgeSidebar', 'notifBadgeMobile'].forEach(id => {
+            ['notifBadgeSidebar', 'notifBadgeMobile', 'notifBadgeTopBar'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.innerText = count > 9 ? '9+' : String(count);
@@ -1290,11 +1295,18 @@
             }
         }
         function fireBrowserNotification(n) {
-            try {
-                if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
-                    new Notification('Aura Ultra X', { body: n.text, icon: 'icon-192.png' });
-                }
-            } catch (e) { console.error('Cihaz bildirimi gösterilemedi:', e); }
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            if (document.visibilityState === 'visible') return;
+            const opts = { body: n.text, icon: 'icon-192.png', badge: 'icon-192.png' };
+            // Chrome'da (özellikle mobilde) doğrudan "new Notification()" bazen sessizce
+            // çalışmıyor; servis çalışanı üzerinden göstermek çok daha güvenilir.
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.ready
+                    .then(reg => reg.showNotification('Aura Ultra X', opts))
+                    .catch(() => { try { new Notification('Aura Ultra X', opts); } catch (e) { console.error('Cihaz bildirimi gösterilemedi:', e); } });
+            } else {
+                try { new Notification('Aura Ultra X', opts); } catch (e) { console.error('Cihaz bildirimi gösterilemedi:', e); }
+            }
         }
 
         /* ==========================================================================
@@ -1387,6 +1399,26 @@
             loadFeed();
             renderLeaderboard();
             subscribeNotifications();
+            requestNotifPermission();
+            tryResumeActiveRoom();
+        }
+
+        // Sayfa yenilense/uygulama kapanıp açılsa bile, "Çık" düğmesine
+        // basılmadığı sürece kullanıcı en son bulunduğu odaya otomatik döner.
+        async function tryResumeActiveRoom() {
+            const savedRoom = localStorage.getItem('aurax_active_room');
+            if (!savedRoom) return;
+            try {
+                const doc = await firestore.collection('rooms').doc(savedRoom).get();
+                if (!doc.exists) { localStorage.removeItem('aurax_active_room'); return; }
+                const data = doc.data();
+                if (currentUser !== ADMIN_USER && !(data.members || []).includes(currentUser)) {
+                    localStorage.removeItem('aurax_active_room');
+                    return;
+                }
+                switchView('odalar');
+                enterRoomUI(savedRoom);
+            } catch (e) { console.error('Odaya otomatik dönülemedi:', e); }
         }
 
         /* --- PROFİLİM (profil yönetimi) --- */
@@ -1784,6 +1816,7 @@
 
         function enterRoomUI(roomName) {
             activeRoom = roomName;
+            localStorage.setItem('aurax_active_room', roomName);
             document.getElementById('roomSelectionArea').style.display = 'none';
             document.getElementById('roomChatArea').style.display = 'flex';
             document.getElementById('activeRoomTitle').innerText = roomName;
@@ -1803,11 +1836,20 @@
         }
 
         function leaveRoom() {
+            // Gerçek çıkış: yönetici/kurucu değilse üyelikten de düşer, böylece bu
+            // odadan artık mesaj bildirimi gelmez (daha önce "Çık" sadece ekranı
+            // kapatıyordu, üyelik Firestore'da kalıyordu — bildirimler bu yüzden
+            // odadan hiç ayrılmamış gibi gelmeye devam ediyordu).
+            if (activeRoom && activeRoomData && !isRoomAdmin(activeRoomData)) {
+                const members = (activeRoomData.members || []).filter(x => x !== currentUser);
+                firestore.collection('rooms').doc(activeRoom).update({ members }).catch(console.error);
+            }
             if (roomUnsubscribe) { roomUnsubscribe(); roomUnsubscribe = null; }
             stopGas();
             closeRacePanel();
             cancelChatCompose();
             activeRoom = null; activeRoomData = null;
+            localStorage.removeItem('aurax_active_room');
             document.getElementById('roomSelectionArea').style.display = 'block';
             document.getElementById('roomChatArea').style.display = 'none';
         }
