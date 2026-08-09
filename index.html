@@ -705,7 +705,6 @@
     <div class="mobile-bottom-nav">
         <a class="mobile-nav-item active" onclick="switchView('kesfet')"><i class="fa-solid fa-compass"></i></a>
         <a class="mobile-nav-item" onclick="openSearchPanel()"><i class="fa-solid fa-magnifying-glass"></i></a>
-        <a class="mobile-nav-item" onclick="openNotifPanel()"><i class="fa-solid fa-bell"></i><span class="notif-badge-dot" id="notifBadgeMobile">0</span></a>
         <a class="mobile-nav-item" onclick="switchView('odalar')"><i class="fa-solid fa-comments"></i></a>
         <a class="mobile-nav-item" onclick="switchView('liderlik')"><i class="fa-solid fa-trophy"></i></a>
         <a class="mobile-nav-item" id="mobileNavAdmin" style="display:none; color: var(--danger);" onclick="switchView('yonetim')"><i class="fa-solid fa-shield-halved"></i></a>
@@ -1231,7 +1230,7 @@
 
         function renderNotifBadge() {
             const count = db_notifications.filter(n => !n.read).length;
-            ['notifBadgeSidebar', 'notifBadgeMobile', 'notifBadgeTopBar', 'notifBadgeDesktopTop'].forEach(id => {
+            ['notifBadgeSidebar', 'notifBadgeTopBar', 'notifBadgeDesktopTop'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.innerText = count > 9 ? '9+' : String(count);
