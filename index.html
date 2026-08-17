@@ -3011,7 +3011,7 @@
                 const snap = await firestore.collection('users').doc(username).get();
                 if (!snap.exists) return showToast("Bu kullanıcı bulunamadı.", "error");
 
-                sendNotification(username, 'admin_message', `Yönetimden mesaj: "${message}"`);
+                sendNotification(username, 'admin_message', `AURA ULTRA X: "${message}"`);
 
                 usernameInput.value = '';
                 textInput.value = '';
