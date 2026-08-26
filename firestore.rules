@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function username() { return signedIn() && request.auth.token.username != null ? request.auth.token.username : ''; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function isSelf(u) { return signedIn() && username() == u; }
+    function isRoomMember(data) { return signedIn() && username() in data.members; }
+    function isRoomAdmin(data) { return signedIn() && (isAdmin() || data.admin == username() || username() in data.admins); }
+    function canDraw(data) {
+      let p = data.get('permissions', {});
+      let d = p.get('draw', {});
+      return isRoomAdmin(data) ||
+        d.get('mode', 'everyone') == 'everyone' ||
+        (d.get('mode', 'everyone') == 'selected' && username() in d.get('users', []));
+    }
+    function canAddVideo(data) {
+      let p = data.get('permissions', {});
+      let v = p.get('video', {});
+      return isRoomAdmin(data) ||
+        v.get('mode', 'everyone') == 'everyone' ||
+        (v.get('mode', 'everyone') == 'selected' && username() in v.get('users', []));
+    }
+    function joiningSelf() {
+      return signedIn() &&
+        username() in request.resource.data.members &&
+        !(username() in resource.data.members) &&
+        request.resource.data.members.size() == resource.data.members.size() + 1 &&
+        request.resource.data.members.hasAll(resource.data.members);
+    }
+    function onlyChat() { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['messages']); }
+    function onlyDrawing() { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['drawing']); }
+    function onlyYoutubeSync() { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['youtubeSync']); }
+    function onlyYoutubeQueue() { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['youtubeQueue','youtubeCurrentIndex']); }
+
+    match /users/{u} {
+      allow read: if isSelf(u) || isAdmin();
+      allow create: if isSelf(u);
+      allow update, delete: if isSelf(u) || isAdmin();
+    }
+
+    match /bannedUsers/{u} {
+      allow read: if isSelf(u) || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /bannedIPs/{hash} { allow read, write: if isAdmin(); }
+    match /bannedDevices/{hash} { allow read, write: if isAdmin(); }
+
+    match /notifications/{id} {
+      allow read: if signedIn() && (resource.data.to == username() || isAdmin());
+      allow create: if signedIn() && request.resource.data.from == username();
+      allow update, delete: if signedIn() && (resource.data.to == username() || isAdmin());
+    }
+
+    match /rooms/{roomId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.admin == username() && request.resource.data.members.hasAll([username()]);
+      allow update: if isAdmin() ||
+        isRoomAdmin(resource.data) ||
+        joiningSelf() ||
+        (isRoomMember(resource.data) && onlyChat() && !resource.data.locked && !(username() in resource.data.muted)) ||
+        (isRoomMember(resource.data) && onlyDrawing() && canDraw(resource.data)) ||
+        (isRoomMember(resource.data) && onlyYoutubeSync()) ||
+        (isRoomMember(resource.data) && onlyYoutubeQueue() && canAddVideo(resource.data));
+      allow delete: if isAdmin() || (signedIn() && resource.data.admin == username());
+    }
+
+    match /posts/{postId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.author == username();
+      allow update, delete: if isAdmin() || (signedIn() && resource.data.author == username());
+    }
+    match /reports/{id} {
+      allow read: if isAdmin();
+      allow create: if signedIn() && request.resource.data.reporter == username();
+      allow update, delete: if isAdmin();
+    }
+    match /votes/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.voter == username();
+      allow update, delete: if isAdmin();
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
