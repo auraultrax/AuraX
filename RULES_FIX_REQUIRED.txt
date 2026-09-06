@@ -1,0 +1,3 @@
+CRITICAL: firestore.rules has been updated for the current local-admin architecture.
+Firebase Console/CLI MUST deploy this exact firestore.rules file to project aura-ultra-x.
+The website code alone cannot change already-deployed Firestore Rules.

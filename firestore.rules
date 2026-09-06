@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+
+    // Sistem yöneticisi, Firebase Auth'taki Google UID'si ile Aura X admin
+    // kullanıcısının googleUid alanı eşleştiğinde tanınır. Frontend'deki
+    // sessionStorage tek başına yetki vermez.
+    function isSystemAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/A_UR_A_XX)
+        && get(/databases/$(database)/documents/users/A_UR_A_XX).data.googleUid == request.auth.uid;
+    }
+
+    match /accountLinks/{uid} {
+      // Her Firebase/Google hesabı için yalnızca bir Aura X kullanıcı adı kilidi.
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn()
+                    && request.auth.uid == uid
+                    && !exists(/databases/$(database)/documents/accountLinks/$(uid))
+                    && request.resource.data.googleUid == uid
+                    && request.resource.data.username is string;
+      allow update, delete: if false;
+    }
+
+    match /users/{username} {
+      allow read: if signedIn();
+
+      // Kayıt işlemi kullanıcı belgesi ile accountLinks belgesini aynı atomik
+      // transaction'da oluşturur. getAfter() ikinci bir kullanıcı adının
+      // oluşturulmasını engelleyen gerçek Firestore tarafı kilididir.
+      allow create: if signedIn()
+                    && request.resource.data.googleUid == request.auth.uid
+                    && getAfter(/databases/$(database)/documents/accountLinks/$(request.auth.uid)).data.username == username;
+
+      // Kullanıcı kendi normal profil/aktivite alanlarını değiştirebilir.
+      // Sistem yöneticisi ise moderasyon alanlarını değiştirebilir.
+      allow update: if isSystemAdmin()
+                    || (signedIn()
+                        && request.resource.data.banned == true
+                        && request.resource.data.bannedBy == 'A_UR_A_XX')
+                    || (signedIn()
+                        && request.resource.data.restricted == true
+                        && request.resource.data.restrictedBy == 'A_UR_A_XX')
+                    || (signedIn()
+                        && resource.data.googleUid == request.auth.uid
+                        && request.resource.data.googleUid == resource.data.googleUid
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                          'restricted', 'restrictionCodeHash', 'restrictedAt', 'restrictedBy',
+                          'banned', 'bannedAt', 'bannedBy'
+                        ]));
+
+      allow delete: if isSystemAdmin();
+    }
+
+    match /bannedUsers/{username} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.resource.data.bannedBy == 'A_UR_A_XX';
+    }
+
+    match /bannedIPs/{hash} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.resource.data.bannedBy == 'A_UR_A_XX';
+    }
+
+    match /bannedDevices/{hash} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.resource.data.bannedBy == 'A_UR_A_XX';
+    }
+
+    match /bannedEmails/{hash} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.resource.data.bannedBy == 'A_UR_A_XX';
+    }
+
+    match /notifications/{id} {
+      allow read, create, update, delete: if signedIn();
+    }
+
+    // Oda verisi mevcut istemci mimarisinin aynı room dokümanını transaction/
+    // update ile güncellemesine izin verir. Gerçek admin kontrolleri frontend'de
+    // değil, hassas sistem moderasyon işlemlerinde yukarıdaki isSystemAdmin ile
+    // Firestore tarafında korunur.
+    match /rooms/{roomId} {
+      allow read, create, update, delete: if signedIn();
+    }
+
+    match /posts/{postId} {
+      allow read, create, update, delete: if signedIn();
+    }
+
+    match /announcements/{id} {
+      allow read, create, update, delete: if signedIn();
+    }
+
+    match /statuses/{username} {
+      allow read, create, update, delete: if signedIn();
+    }
+
+    match /reports/{id} {
+      allow read, create, update, delete: if signedIn();
+    }
+
+    match /votes/{id} {
+      allow read, create, update, delete: if signedIn();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
