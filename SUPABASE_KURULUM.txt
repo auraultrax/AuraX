@@ -1,0 +1,44 @@
+AURA X — SADECE SUPABASE VERİ + MEDYA / FIREBASE AUTH
+
+1) Supabase Dashboard > SQL Editor:
+   AURAX_SUPABASE_SQL.sql içeriğini tek seferde çalıştırın.
+
+2) Supabase Edge Functions:
+   supabase/functions/aurax-data/index.ts
+   supabase/functions/aurax-media/index.ts
+   dosyalarını deploy edin.
+
+3) Edge Function secrets:
+   AURAX_FIREBASE_PROJECT_ID = aura-ultra-x
+   AURAX_SUPABASE_SERVICE_ROLE_KEY = Supabase'in server-side Secret/Service Role anahtarı
+   Bu anahtarı asla HTML/JS içine koymayın.
+
+4) Tek admin:
+   Firebase Console > Authentication > Users bölümünden admin Google hesabının UID'sini alın.
+   SQL Editor'da:
+   insert into public.aurax_admins (firebase_uid, username, active)
+   values ('GERCEK_FIREBASE_UID', 'A_UR_A_XX', true)
+   on conflict (firebase_uid)
+   do update set username = excluded.username, active = true;
+
+   aurax_admins tablosunda active=true için tek kayıt kullanılabilir.
+
+5) AuraCell:
+   9ho... ZIP içindeki index.html artık anonim Firebase oturumu açmaz.
+   Yalnızca admin olarak Google ile giriş yaptıktan sonra odaları yönetir.
+   Oda kilitleme / kilit açma / YouTube süre verme / kapatma işlemleri Supabase Edge Function üzerinden yapılır.
+
+6) Firebase:
+   Firestore ve Firebase Storage için client erişimi kapatılmıştır.
+   Firebase yalnızca Authentication için kullanılır: Google + Email/Password + password reset.
+
+7) Kullanıcı kayıtları:
+   Supabase public.aurax_documents içinde collection='users' olarak kaydedilir.
+   Firebase UID/googleUid de kayıt verisinin içinde tutulur.
+   Firebase UID <-> Aura kullanıcı adı eşleşmesi aurax_identities tablosundadır.
+
+8) Log:
+   aurax_audit_log; kayıt, oda işlemleri, kullanıcı/rapor/yönetim yazma-silme işlemlerini kullanıcı UID ve kullanıcı adıyla kaydeder.
+
+9) Eski Firestore verileri:
+   Bu sürüm yeni yazma/okumayı Supabase'e taşır. Eski Firestore verilerinin otomatik taşınması bu pakette yapılmaz; mevcut veriler için ayrı bir kontrollü migration gerekir.

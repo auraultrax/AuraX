@@ -1,0 +1,8 @@
+ODA SİLME KURALI
+
+Oda silme işlemi soft-delete kullanmaz. Oda Supabase aurax_documents tablosundan GERÇEKTEN silinir.
+
+Yetki: oda sahibi/kurucusu, oda admins listesindeki yöneticiler veya sistem admini.
+Silme istemciden doğrudan Firebase/Firestore'a gönderilmez; Firebase Auth ID token doğrulaması ile Supabase Edge Function (aurax-data) üzerinden yapılır.
+
+Bu nedenle oda adminleri de kendi yönettikleri odaları silebilir ve oda tüm kullanıcıların listelerinden kaldırılır.

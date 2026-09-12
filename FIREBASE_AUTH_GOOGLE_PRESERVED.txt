@@ -1,0 +1,7 @@
+Aura X'te Firebase yalnızca Authentication için kullanılır:
+- Google ile giriş/kayıt
+- Firebase Email/Password kimlik doğrulaması
+- Şifre sıfırlama e-postası
+
+Uygulama verisi, odalar, kullanıcı profilleri, mesajlar, raporlar, yönetim kayıtları ve medya Supabase üzerinden tutulur.
+Firebase Firestore ve Firebase Storage kuralları istemci erişimini kapatır.
