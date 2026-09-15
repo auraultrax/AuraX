@@ -1,0 +1,5 @@
+[functions.aurax-data]
+verify_jwt = false
+
+[functions.aurax-media]
+verify_jwt = false
