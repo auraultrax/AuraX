@@ -1,3 +1,0 @@
-Bu sürümde Firebase Authentication + Google signInWithPopup akışı değiştirilmemiştir.
-Firebase yalnızca Auth için değil, mevcut kaynakta Firestore için de kullanılmaktadır.
-Supabase Storage koduna dokunulmamıştır.
