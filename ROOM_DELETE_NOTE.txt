@@ -1,0 +1,7 @@
+ODA SİLME KURALI
+
+Odayı silme işlemi soft-delete kullanmaz. Oda Firestore rooms/{roomId} dokümanı olarak GERÇEKTEN silinir. Böylece tüm kullanıcıların gerçek zamanlı oda listelerinden kaldırılır ve odaya tekrar girilemez.
+
+Yeni odalarda ownerUid, Google/Firebase Auth kullanıcısının UID değeridir. Mevcut eski odalarda admin kullanıcı adı üzerinden silme yetkisi korunur.
+
+Güncelleme sonrası firestore.rules dosyasını Firebase Console veya Firebase CLI ile deploy etmek zorunludur; aksi halde mevcut sunucu kuralları silme isteğini reddedebilir.
