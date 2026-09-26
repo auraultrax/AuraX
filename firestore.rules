@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isSelfUser(username) {
+      return signedIn() && request.auth.uid == resource.data.googleUid && username == resource.id;
+    }
+    function currentUsername() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/accountLinks/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/accountLinks/$(request.auth.uid)).data.username
+        : '';
+    }
+    function isSystemAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/A_UR_A_XX)
+        && get(/databases/$(database)/documents/users/A_UR_A_XX).data.googleUid == request.auth.uid;
+    }
+    function isRoomAdmin() {
+      return signedIn() && (
+        resource.data.ownerUid == request.auth.uid
+        || resource.data.admin == currentUsername()
+        || (resource.data.admins is list && resource.data.admins.hasAny([currentUsername()]))
+        || isSystemAdmin()
+      );
+    }
+
+    match /accountLinks/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update, delete: if false;
+    }
+
+    // Public profile document only. Passwords live in privateCredentials and are never client-readable.
+    match /users/{username} {
+      allow read: if signedIn();
+      allow create: if false; // registration is server-only via registerWithGoogle()
+      allow update: if isSystemAdmin()
+        || (signedIn() && resource.data.googleUid == request.auth.uid
+          && request.resource.data.googleUid == resource.data.googleUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'firstName','lastName','displayName','region','bio','mood','avatarUrl','avatarPath',
+            'following','roomInvite','lastSeenAt','lastIpHash','lastDeviceHash'
+          ]));
+      allow delete: if isSystemAdmin();
+      match /pushTokens/{tokenId} {
+        allow read, write: if false; // handled only by Cloud Functions
+      }
+    }
+
+    match /privateCredentials/{username} {
+      allow read, write: if false;
+    }
+    match /roomSecrets/{roomId} {
+      allow read, write: if false;
+    }
+
+    match /restrictions/{username} {
+      allow read: if isSystemAdmin() || (signedIn() && currentUsername() == username);
+      allow create, update, delete: if isSystemAdmin();
+    }
+    match /bannedUsers/{username} {
+      allow read: if isSystemAdmin() || (signedIn() && currentUsername() == username);
+      allow write: if isSystemAdmin();
+    }
+    match /bannedIPs/{hash} { allow read: if false; allow write: if isSystemAdmin(); }
+    match /bannedDevices/{hash} { allow read: if false; allow write: if isSystemAdmin(); }
+    match /bannedEmails/{hash} { allow read: if false; allow write: if isSystemAdmin(); }
+
+    match /notifications/{id} {
+      allow read: if signedIn() && (
+        resource.data.to == currentUsername() || resource.data.from == currentUsername()
+      );
+      allow create: if false; // only Cloud Functions can create notifications
+      allow update: if signedIn() && resource.data.to == currentUsername()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if signedIn() && (
+        resource.data.from == currentUsername()
+        || resource.data.to == currentUsername()
+      );
+    }
+
+    match /rooms/{roomId} {
+      allow read: if signedIn();
+      allow create: if false; // createRoomSecure() only
+      allow update: if isRoomAdmin()
+        || (signedIn() && resource.data.members is list && resource.data.members.hasAny([currentUsername()])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['messages','youtubeQueue','youtubeCurrentIndex','youtubeSync','drawing','pinnedMessageId']))
+        || (signedIn() && resource.data.members is list && resource.data.members.hasAny([currentUsername()])
+          && request.resource.data.members is list
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+          && resource.data.members.hasAny([currentUsername()])
+          && !request.resource.data.members.hasAny([currentUsername()])
+          && request.resource.data.members.size() == resource.data.members.size() - 1);
+      allow delete: if isRoomAdmin();
+    }
+
+    match /posts/{postId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.author == currentUsername();
+      allow update: if isSystemAdmin()
+        || (signedIn() && resource.data.author == currentUsername() && request.resource.data.author == resource.data.author)
+        || (signedIn() && request.resource.data.author == resource.data.author
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy','comments']));
+      allow delete: if isSystemAdmin() || (signedIn() && resource.data.author == currentUsername());
+    }
+    match /statuses/{username} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && username == currentUsername() && request.resource.data.author == currentUsername() && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if isSystemAdmin() || (signedIn() && username == currentUsername());
+    }
+    match /reports/{id} {
+      allow create: if signedIn() && request.resource.data.reporter == currentUsername();
+      allow read, delete: if isSystemAdmin();
+      allow update: if false;
+    }
+    match /announcements/{id} {
+      allow read: if signedIn();
+      allow create, update, delete: if isSystemAdmin();
+    }
+    match /votes/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.voter == currentUsername();
+      allow update: if false;
+      allow delete: if isSystemAdmin() || (signedIn() && resource.data.voter == currentUsername());
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

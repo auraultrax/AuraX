@@ -1,0 +1,9 @@
+Bu sürümde Google yalnızca:
+- Google ile Kayıt Ol
+- Şifremi Unuttum
+
+akışlarında hesap seçimi için kullanılır.
+
+Normal Giriş Yap akışında Google hesap seçimi tamamen kaldırılmıştır. Kullanıcı adı + şifre, Firebase Cloud Function üzerinden doğrulanır ve Firebase Custom Token ile güvenli oturum açılır.
+
+Firestore oda/veri işlemleri ve Supabase Storage mevcut yapıda korunmuştur.
