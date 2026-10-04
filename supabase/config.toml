@@ -1,0 +1,8 @@
+[functions.username-login]
+verify_jwt = false
+
+[functions.youtube-search]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = true
