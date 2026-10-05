@@ -1,3 +1,0 @@
-Supabase Edge Functions kullanılıyorsa gerekli secret'lar dashboard üzerinden eklenmelidir:
-SUPABASE_SERVICE_ROLE_KEY (delete-account için)
-YOUTUBE_API_KEY (youtube-search için)
