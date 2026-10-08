@@ -1,0 +1,11 @@
+[functions.username-login]
+verify_jwt = false
+
+[functions.youtube-search]
+verify_jwt = false  # JWT fonksiyon içinde doğrulanıyor (anon anahtar kabul edilmez)
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.send-push]
+verify_jwt = true
